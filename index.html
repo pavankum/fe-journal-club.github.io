@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab Journal Club</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f2eb; --bg2: #edeae0; --surface: #fffefa;
+    --border: #c8c4b6; --border-light: #e0ddd4;
+    --text: #1a1814; --text-muted: #6b6860; --text-dim: #9a978e;
+    --accent: #1d3a5e; --accent-light: #e8edf4;
+    --green: #1a4a2e; --green-light: #e6f0e9;
+    --red: #5c1a1a; --red-light: #f0e6e6;
+    --amber: #5c3d0a; --amber-light: #f5eedc;
+    --tag-bg: #ddd9cc; --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05);
+    --radius: 4px;
+  }
+  body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 15px; line-height: 1.6; }
+
+  /* ── LOCK SCREEN ── */
+  #lock-screen {
+    position: fixed; inset: 0; background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; flex-direction: column; gap: 0;
+  }
+  #lock-screen.hidden { display: none; }
+  .lock-box {
+    background: var(--surface); border-radius: 8px; padding: 2.5rem 2rem;
+    width: 100%; max-width: 360px; box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    display: flex; flex-direction: column; gap: 1rem; align-items: stretch;
+  }
+  .lock-logo {
+    font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 600;
+    color: var(--accent); display: flex; align-items: center; gap: 10px; margin-bottom: 0.25rem;
+  }
+  .lock-logo-dot { width: 9px; height: 9px; background: #f5c842; border-radius: 50%; flex-shrink: 0; }
+  .lock-subtitle { font-size: 13px; color: var(--text-muted); }
+  .lock-label { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; }
+  .lock-input {
+    width: 100%; font-family: 'IBM Plex Sans', sans-serif; font-size: 15px;
+    padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg); color: var(--text); letter-spacing: 0.05em;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .lock-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(29,58,94,0.12); background: white; }
+  .lock-btn {
+    width: 100%; padding: 11px; background: var(--accent); color: white;
+    border: none; border-radius: var(--radius); font-size: 14px; font-weight: 500;
+    cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; transition: opacity 0.15s;
+    margin-top: 0.25rem;
+  }
+  .lock-btn:hover { opacity: 0.88; }
+  .lock-error {
+    font-size: 13px; color: var(--red); background: var(--red-light);
+    border: 1px solid #e8c4c4; border-radius: var(--radius); padding: 8px 12px;
+    display: none;
+  }
+  .lock-error.show { display: block; }
+
+  /* ── SETUP SCREEN ── */
+  #setup-screen {
+    position: fixed; inset: 0; background: rgba(20,18,14,0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 8888; padding: 1rem;
+  }
+  #setup-screen.hidden { display: none; }
+  .setup-box {
+    background: var(--surface); border-radius: 8px; padding: 2rem;
+    width: 100%; max-width: 520px; box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+  }
+  .setup-title { font-family: 'Playfair Display', serif; font-size: 1.2rem; margin-bottom: 0.4rem; }
+  .setup-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6; }
+  .setup-field { margin-bottom: 0.85rem; }
+  .setup-field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; }
+  .setup-field input {
+    width: 100%; font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg); color: var(--text);
+  }
+  .setup-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(29,58,94,0.1); background: white; }
+  .setup-hint { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .setup-footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-light); }
+  .setup-error { font-size: 13px; color: var(--red); margin-top: 0.75rem; display: none; }
+  .setup-error.show { display: block; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: #1a1814; color: white; font-size: 13px; padding: 10px 18px;
+    border-radius: 20px; z-index: 5000; transition: transform 0.25s ease;
+    pointer-events: none; white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── SYNC STATUS ── */
+  .sync-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    background: #aaa; transition: background 0.3s;
+  }
+  .sync-dot.connected { background: #4caf50; }
+  .sync-dot.error { background: #e53935; }
+  .sync-label { font-size: 12px; color: rgba(255,255,255,0.6); font-family: 'IBM Plex Mono', monospace; }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--accent); color: white; padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px; position: sticky; top: 0; z-index: 100;
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+  }
+  .logo {
+    font-family: 'Playfair Display', serif; font-size: 1.25rem; font-weight: 600;
+    letter-spacing: 0.01em; display: flex; align-items: center; gap: 10px; color: white;
+  }
+  .logo-dot { width: 8px; height: 8px; background: #f5c842; border-radius: 50%; flex-shrink: 0; }
+  .header-right { display: flex; align-items: center; gap: 1rem; }
+  .header-sync { display: flex; align-items: center; gap: 6px; }
+  .header-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px;
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 500;
+    border-radius: var(--radius); border: 1px solid transparent; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap; text-decoration: none;
+  }
+  .btn-primary { background: white; color: var(--accent); border-color: white; }
+  .btn-primary:hover { background: #e8edf4; border-color: #e8edf4; }
+  .btn-ghost { background: transparent; color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.3); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: white; }
+  .btn-outline { background: transparent; color: var(--accent); border-color: var(--border); }
+  .btn-outline:hover { background: var(--accent-light); border-color: var(--accent); }
+  .btn-danger { background: transparent; color: var(--red); border-color: var(--border); }
+  .btn-danger:hover { background: var(--red-light); border-color: var(--red); }
+  .btn-success { background: var(--green); color: white; border-color: var(--green); }
+  .btn-success:hover { opacity: 0.9; }
+
+  /* ── TABS ── */
+  .tabs { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; }
+  .tab {
+    padding: 14px 20px; font-size: 13px; font-weight: 500; color: var(--text-muted);
+    cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s;
+    display: flex; align-items: center; gap: 7px; margin-bottom: -1px;
+    font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.02em; user-select: none;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-count {
+    background: var(--tag-bg); color: var(--text-muted);
+    border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 500;
+  }
+  .tab.active .tab-count { background: var(--accent-light); color: var(--accent); }
+
+  /* ── MAIN ── */
+  main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* ── NAME BANNER ── */
+  .name-banner {
+    background: var(--accent-light); border: 1px solid #c5d3e8; border-radius: var(--radius);
+    padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  }
+  .name-banner-text { font-size: 13px; color: var(--accent); }
+  .name-banner-form { display: flex; gap: 0.5rem; align-items: center; }
+  .name-banner input { font-size: 13px; padding: 5px 10px; width: 160px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); font-family: 'IBM Plex Sans', sans-serif; }
+  .name-banner input:focus { outline: none; border-color: var(--accent); background: white; }
+
+  /* ── ADD FORM ── */
+  .add-form {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow);
+  }
+  .form-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 1rem; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.02em; }
+  input, textarea {
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; padding: 8px 12px;
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg);
+    color: var(--text); transition: border-color 0.15s, box-shadow 0.15s; width: 100%;
+  }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(29,58,94,0.1); background: white; }
+  textarea { resize: vertical; min-height: 60px; }
+  .form-footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-light); }
+
+  /* ── SORT BAR ── */
+  .sort-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; font-size: 12px; color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; flex-wrap: wrap; }
+  .sort-btn { padding: 4px 10px; border: 1px solid var(--border-light); border-radius: 20px; background: transparent; font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer; color: var(--text-muted); transition: all 0.15s; }
+  .sort-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .sort-btn:not(.active):hover { background: var(--bg2); }
+
+  /* ── ARTICLE CARDS ── */
+  .article-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .article-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem 1.25rem; box-shadow: var(--shadow);
+    display: grid; grid-template-columns: 64px 1fr auto; gap: 1rem; align-items: start;
+    transition: border-color 0.15s, opacity 0.3s, transform 0.3s;
+  }
+  .article-card.new-card { animation: slideIn 0.35s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  .article-card:hover { border-color: #b0aca0; }
+
+  .vote-block { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 2px; }
+  .vote-btn {
+    width: 36px; height: 36px; border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--bg2); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all 0.15s; flex-shrink: 0;
+  }
+  .vote-btn:hover { background: var(--accent-light); border-color: var(--accent); }
+  .vote-btn.voted { background: var(--accent); border-color: var(--accent); color: white; }
+  .vote-count { font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 500; color: var(--text); text-align: center; min-width: 28px; }
+  .vote-label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase; font-family: 'IBM Plex Mono', monospace; }
+
+  .article-body { min-width: 0; }
+  .article-title { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 600; color: var(--text); line-height: 1.4; margin-bottom: 4px; }
+  .article-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .article-link {
+    font-size: 12px; color: var(--accent); text-decoration: none; font-family: 'IBM Plex Mono', monospace;
+    max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: inline-block; vertical-align: middle;
+  }
+  .article-link:hover { text-decoration: underline; }
+  .article-notes { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.5; }
+  .article-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.03em; }
+  .tag-suggested { background: var(--amber-light); color: var(--amber); border: 1px solid #e8d8b0; }
+  .tag-date { background: var(--bg2); color: var(--text-muted); border: 1px solid var(--border-light); }
+  .tag-suggester { background: transparent; color: var(--text-dim); font-size: 12px; font-family: 'IBM Plex Sans', sans-serif; }
+
+  .article-actions { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; min-width: 100px; }
+
+  /* ── ARCHIVE CARDS ── */
+  .archive-card {
+    background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius);
+    padding: 1rem 1.25rem; display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: start; opacity: 0.85;
+  }
+  .archive-date-badge { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--green); background: var(--green-light); border: 1px solid #b8d8c2; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .archive-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .vote-archive { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-dim); }
+
+  /* ── MODAL ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(20,18,14,0.5); z-index: 200; align-items: center; justify-content: center; padding: 1rem; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; width: 100%; max-width: 480px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+  .modal-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .modal-body { margin: 1rem 0; font-size: 14px; color: var(--text-muted); }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-dim); }
+  .empty-icon { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.4; }
+  .empty-state p { font-size: 14px; }
+
+  /* ── LOADING ── */
+  .loading-state { text-align: center; padding: 3rem 2rem; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+    .article-card { grid-template-columns: 48px 1fr; }
+    .article-actions { flex-direction: row; flex-wrap: wrap; }
+    header { padding: 0 1rem; }
+    main { padding: 1.25rem 1rem; }
+    .header-sync { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── LOCK SCREEN ── -->
+<div id="lock-screen">
+  <div class="lock-box">
+    <div class="lock-logo"><div class="lock-logo-dot"></div>Lab Journal Club</div>
+    <div class="lock-subtitle">Enter the lab password to continue.</div>
+    <div>
+      <div class="lock-label">Password</div>
+      <input class="lock-input" type="password" id="pw-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkPassword()">
+    </div>
+    <div class="lock-error" id="lock-error">Incorrect password. Try again.</div>
+    <button class="lock-btn" onclick="checkPassword()">Enter →</button>
+  </div>
+</div>
+
+<!-- ── SETUP SCREEN (first-time Firebase config) ── -->
+<div id="setup-screen" class="hidden">
+  <div class="setup-box">
+    <div class="setup-title">One-time Firebase Setup</div>
+    <div class="setup-desc">
+      To enable real-time sync, you need a free Firebase Realtime Database.
+      Create one at <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent);">console.firebase.google.com</a>
+      → New project → Realtime Database → Start in <strong>test mode</strong>. Then paste your config below.
+      This is saved in your browser and shared via the URL hash for teammates.
+    </div>
+    <div class="setup-field">
+      <label>Database URL</label>
+      <input type="url" id="cfg-url" placeholder="https://your-project-default-rtdb.firebaseio.com">
+      <div class="setup-hint">Found in Firebase Console → Realtime Database → Data tab</div>
+    </div>
+    <div class="setup-field">
+      <label>API Key</label>
+      <input type="text" id="cfg-key" placeholder="AIzaSy...">
+      <div class="setup-hint">Found in Project Settings → General → Web API Key</div>
+    </div>
+    <div class="setup-field">
+      <label>Page Password</label>
+      <input type="text" id="cfg-pw" placeholder="Choose a password for your lab">
+    </div>
+    <div class="setup-error" id="setup-error"></div>
+    <div class="setup-footer">
+      <button class="btn btn-outline" onclick="dismissSetup()">Skip (use local only)</button>
+      <button class="btn btn-success" onclick="saveSetup()">Connect & Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast"></div>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo"><div class="logo-dot"></div>Lab Journal Club</div>
+  <div class="header-right">
+    <div class="header-sync">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span class="sync-label" id="sync-label">connecting…</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost" onclick="showTab('archive')">Archive</button>
+      <button class="btn btn-primary" onclick="openAddForm()">+ Suggest Article</button>
+    </div>
+  </div>
+</header>
+
+<!-- ── TABS ── -->
+<div class="tabs">
+  <div class="tab active" id="tab-queue" onclick="showTab('queue')">Reading Queue <span class="tab-count" id="count-queue">0</span></div>
+  <div class="tab" id="tab-archive" onclick="showTab('archive')">Archive <span class="tab-count" id="count-archive">0</span></div>
+</div>
+
+<main>
+  <!-- Name banner -->
+  <div class="name-banner" id="name-banner">
+    <span class="name-banner-text">👋 Set your name so others know who's voting and suggesting.</span>
+    <div class="name-banner-form">
+      <input type="text" id="name-input" placeholder="Your name…" maxlength="40" onkeydown="if(event.key==='Enter')saveName()">
+      <button class="btn btn-outline" onclick="saveName()">Save</button>
+    </div>
+  </div>
+
+  <!-- Queue view -->
+  <div id="view-queue">
+    <div class="add-form" id="add-form" style="display:none;">
+      <div class="form-title">New Article Suggestion</div>
+      <div class="form-row">
+        <div class="form-group full">
+          <label>Article Title *</label>
+          <input type="text" id="f-title" placeholder="e.g. Attention Is All You Need" maxlength="200">
+        </div>
+        <div class="form-group full">
+          <label>Link / DOI *</label>
+          <input type="url" id="f-link" placeholder="https://…">
+        </div>
+        <div class="form-group">
+          <label>Authors</label>
+          <input type="text" id="f-authors" placeholder="Vaswani et al." maxlength="100">
+        </div>
+        <div class="form-group">
+          <label>Year / Journal</label>
+          <input type="text" id="f-journal" placeholder="2017 · NeurIPS" maxlength="80">
+        </div>
+        <div class="form-group full">
+          <label>Notes / Why read this?</label>
+          <textarea id="f-notes" placeholder="Brief note about why this is interesting…"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Suggested discussion date</label>
+          <input type="date" id="f-date">
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-outline" onclick="closeAddForm()">Cancel</button>
+        <button class="btn btn-success" onclick="submitArticle()">Submit</button>
+      </div>
+    </div>
+
+    <div class="sort-bar">
+      Sort by:
+      <button class="sort-btn active" id="sort-votes" onclick="setSort('votes')">Most votes</button>
+      <button class="sort-btn" id="sort-date" onclick="setSort('date')">Discussion date</button>
+      <button class="sort-btn" id="sort-new" onclick="setSort('new')">Newest</button>
+    </div>
+
+    <div class="article-list" id="article-list">
+      <div class="loading-state"><div class="spinner"></div><br>Loading articles…</div>
+    </div>
+  </div>
+
+  <!-- Archive view -->
+  <div id="view-archive" style="display:none;">
+    <div class="article-list" id="archive-list">
+      <div class="loading-state"><div class="spinner"></div><br>Loading archive…</div>
+    </div>
+  </div>
+</main>
+
+<!-- Archive modal -->
+<div class="modal-overlay" id="archive-modal">
+  <div class="modal">
+    <div class="modal-title">Move to Archive?</div>
+    <div class="modal-body">
+      This will mark <strong id="archive-article-name"></strong> as discussed and move it to the archive.
+      <div class="form-group" style="margin-top:1rem;">
+        <label>Discussion date</label>
+        <input type="date" id="archive-date-input" style="width:180px;">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('archive-modal')">Cancel</button>
+      <button class="btn btn-success" onclick="confirmArchive()">Archive It</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete modal -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal">
+    <div class="modal-title">Delete Article?</div>
+    <div class="modal-body">Remove <strong id="delete-article-name"></strong> from the queue? This cannot be undone.</div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('delete-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK v9 compat -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   CONFIG & STATE
+═══════════════════════════════════════════════════ */
+const CONFIG_KEY = 'jc_firebase_config';
+const NAME_KEY   = 'jc_name';
+const SORT_KEY   = 'jc_sort';
+const AUTH_KEY   = 'jc_authed';
+
+// PASSWORD — change this string to set your lab password.
+// If you use Firebase, the password is also stored in the setup config.
+const DEFAULT_PASSWORD = 'labclub2025';
+
+let cfg = null;       // { dbUrl, apiKey, password }
+let db  = null;       // Firebase database ref
+let articles = {};    // keyed by Firebase push ID
+let archive  = {};
+let userName = '';
+let sortMode = 'votes';
+let pendingArchiveId = null;
+let pendingDeleteId  = null;
+let isInitialLoad = true;
+
+/* ═══════════════════════════════════════════════════
+   PASSWORD / LOCK
+═══════════════════════════════════════════════════ */
+function getPassword() {
+  return (cfg && cfg.password) ? cfg.password : DEFAULT_PASSWORD;
+}
+
+function checkPassword() {
+  const val = document.getElementById('pw-input').value;
+  const err = document.getElementById('lock-error');
+  if (val === getPassword()) {
+    sessionStorage.setItem(AUTH_KEY, '1');
+    document.getElementById('lock-screen').classList.add('hidden');
+    err.classList.remove('show');
+    init();
+  } else {
+    err.classList.add('show');
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   FIREBASE SETUP
+═══════════════════════════════════════════════════ */
+function loadConfig() {
+  try { cfg = JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch(e) { cfg = null; }
+}
+
+function saveSetup() {
+  const url = document.getElementById('cfg-url').value.trim();
+  const key = document.getElementById('cfg-key').value.trim();
+  const pw  = document.getElementById('cfg-pw').value.trim();
+  const err = document.getElementById('setup-error');
+  if (!url || !key) { err.textContent = 'Database URL and API Key are required.'; err.classList.add('show'); return; }
+  cfg = { dbUrl: url, apiKey: key, password: pw || DEFAULT_PASSWORD };
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+  err.classList.remove('show');
+  document.getElementById('setup-screen').classList.add('hidden');
+  connectFirebase();
+}
+
+function dismissSetup() {
+  document.getElementById('setup-screen').classList.add('hidden');
+  setSyncStatus('error', 'local only');
+  renderQueue();
+  renderArchive();
+}
+
+function connectFirebase() {
+  if (!cfg || !cfg.dbUrl || !cfg.apiKey) {
+    setSyncStatus('error', 'not configured');
+    showSetupPrompt();
+    return;
+  }
+  try {
+    // Initialise or reuse Firebase app
+    let app;
+    try { app = firebase.app(); } catch(e) { app = null; }
+    if (!app) {
+      app = firebase.initializeApp({ apiKey: cfg.apiKey, databaseURL: cfg.dbUrl });
+    }
+    db = firebase.database();
+    setSyncStatus('', 'connecting…');
+    subscribeToData();
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    setSyncStatus('error', 'connection error');
+  }
+}
+
+function showSetupPrompt() {
+  // Pre-fill if we have partial config
+  if (cfg) {
+    document.getElementById('cfg-url').value = cfg.dbUrl || '';
+    document.getElementById('cfg-key').value = cfg.apiKey || '';
+    document.getElementById('cfg-pw').value  = cfg.password || '';
+  }
+  document.getElementById('setup-screen').classList.remove('hidden');
+}
+
+/* ═══════════════════════════════════════════════════
+   REAL-TIME SUBSCRIPTIONS
+═══════════════════════════════════════════════════ */
+function subscribeToData() {
+  if (!db) return;
+
+  // Articles
+  db.ref('articles').on('value', snap => {
+    articles = snap.val() || {};
+    setSyncStatus('connected', 'live');
+    renderQueue();
+    isInitialLoad = false;
+  }, err => {
+    console.error(err);
+    setSyncStatus('error', 'sync error');
+  });
+
+  // Archive
+  db.ref('archive').on('value', snap => {
+    archive = snap.val() || {};
+    document.getElementById('count-archive').textContent = Object.keys(archive).length;
+    if (document.getElementById('view-archive').style.display !== 'none') renderArchive();
+  });
+
+  // Presence / connection state
+  db.ref('.info/connected').on('value', snap => {
+    if (snap.val()) setSyncStatus('connected', 'live');
+    else setSyncStatus('', 'reconnecting…');
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   SYNC STATUS
+═══════════════════════════════════════════════════ */
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = 'sync-dot' + (state ? ' ' + state : '');
+  lbl.textContent = label;
+}
+
+/* ═══════════════════════════════════════════════════
+   NAME
+═══════════════════════════════════════════════════ */
+function saveName() {
+  const v = document.getElementById('name-input').value.trim();
+  if (!v) return;
+  userName = v;
+  localStorage.setItem(NAME_KEY, userName);
+  document.getElementById('name-banner').style.display = 'none';
+  toast('Name saved: ' + userName);
+}
+
+/* ═══════════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════════ */
+function showTab(tab) {
+  document.getElementById('view-queue').style.display   = tab === 'queue'   ? '' : 'none';
+  document.getElementById('view-archive').style.display = tab === 'archive' ? '' : 'none';
+  document.getElementById('tab-queue').classList.toggle('active',   tab === 'queue');
+  document.getElementById('tab-archive').classList.toggle('active', tab === 'archive');
+  if (tab === 'archive') renderArchive();
+  if (tab === 'queue')   closeAddForm();
+}
+
+/* ═══════════════════════════════════════════════════
+   ADD FORM
+═══════════════════════════════════════════════════ */
+function openAddForm() {
+  showTab('queue');
+  document.getElementById('add-form').style.display = '';
+  document.getElementById('f-title').focus();
+}
+function closeAddForm() {
+  document.getElementById('add-form').style.display = 'none';
+  ['f-title','f-link','f-authors','f-journal','f-notes','f-date'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+}
+
+async function submitArticle() {
+  const title = document.getElementById('f-title').value.trim();
+  const link  = document.getElementById('f-link').value.trim();
+  if (!title) { document.getElementById('f-title').focus(); return; }
+  if (!link)  { document.getElementById('f-link').focus(); return; }
+
+  const article = {
+    title, link,
+    authors:     document.getElementById('f-authors').value.trim(),
+    journal:     document.getElementById('f-journal').value.trim(),
+    notes:       document.getElementById('f-notes').value.trim(),
+    date:        document.getElementById('f-date').value,
+    suggestedBy: userName || 'Anonymous',
+    createdAt:   Date.now(),
+    votes:       {},
+  };
+
+  if (db) {
+    await db.ref('articles').push(article);
+  } else {
+    // Local fallback
+    const id = Date.now().toString();
+    articles[id] = article;
+    renderQueue();
+  }
+  closeAddForm();
+  toast('Article submitted!');
+}
+
+/* ═══════════════════════════════════════════════════
+   SORT
+═══════════════════════════════════════════════════ */
+function setSort(mode) {
+  sortMode = mode;
+  localStorage.setItem(SORT_KEY, mode);
+  ['votes','date','new'].forEach(m => {
+    document.getElementById('sort-'+m).classList.toggle('active', m === mode);
+  });
+  renderQueue();
+}
+
+function sortedArticles() {
+  const arr = Object.entries(articles).map(([id, a]) => ({ id, ...a }));
+  if (sortMode === 'votes') return arr.sort((a,b) => voteCount(b) - voteCount(a));
+  if (sortMode === 'date')  return arr.sort((a,b) => {
+    if (!a.date && !b.date) return 0; if (!a.date) return 1; if (!b.date) return -1;
+    return a.date.localeCompare(b.date);
+  });
+  return arr.sort((a,b) => b.createdAt - a.createdAt);
+}
+
+function voteCount(art) {
+  if (!art.votes) return 0;
+  return Object.keys(art.votes).length;
+}
+
+/* ═══════════════════════════════════════════════════
+   VOTE
+═══════════════════════════════════════════════════ */
+async function toggleVote(id) {
+  if (!userName) {
+    document.getElementById('name-banner').style.display = '';
+    document.getElementById('name-input').focus();
+    toast('Set your name first to vote!');
+    return;
+  }
+  const art = articles[id];
+  if (!art) return;
+  const votes = art.votes || {};
+  // Use a safe key derived from name (replace non-alphanumeric)
+  const voteKey = userName.replace(/[^a-zA-Z0-9]/g, '_');
+
+  if (db) {
+    const ref = db.ref(`articles/${id}/votes/${voteKey}`);
+    if (votes[voteKey]) await ref.remove();
+    else await ref.set(true);
+  } else {
+    if (votes[voteKey]) delete votes[voteKey];
+    else votes[voteKey] = true;
+    articles[id].votes = votes;
+    renderQueue();
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   ARCHIVE
+═══════════════════════════════════════════════════ */
+function promptArchive(id) {
+  pendingArchiveId = id;
+  const art = articles[id];
+  document.getElementById('archive-article-name').textContent = art ? art.title : '';
+  document.getElementById('archive-date-input').value = new Date().toISOString().split('T')[0];
+  document.getElementById('archive-modal').classList.add('open');
+}
+
+async function confirmArchive() {
+  if (!pendingArchiveId) return;
+  const art = articles[pendingArchiveId];
+  if (!art) { closeModal('archive-modal'); return; }
+  const discussedOn = document.getElementById('archive-date-input').value || new Date().toISOString().split('T')[0];
+  const archivedArt = { ...art, discussedOn };
+
+  if (db) {
+    await db.ref('archive').push(archivedArt);
+    await db.ref(`articles/${pendingArchiveId}`).remove();
+  } else {
+    const archId = Date.now().toString();
+    archive[archId] = archivedArt;
+    delete articles[pendingArchiveId];
+    renderQueue();
+    renderArchive();
+  }
+  closeModal('archive-modal');
+  toast('Moved to archive!');
+}
+
+/* ═══════════════════════════════════════════════════
+   DELETE
+═══════════════════════════════════════════════════ */
+function promptDelete(id) {
+  pendingDeleteId = id;
+  const art = articles[id];
+  document.getElementById('delete-article-name').textContent = art ? art.title : '';
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteId) return;
+  if (db) {
+    await db.ref(`articles/${pendingDeleteId}`).remove();
+  } else {
+    delete articles[pendingDeleteId];
+    renderQueue();
+  }
+  closeModal('delete-modal');
+  toast('Article removed.');
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER QUEUE
+═══════════════════════════════════════════════════ */
+function renderQueue() {
+  const list = document.getElementById('article-list');
+  const sorted = sortedArticles();
+  document.getElementById('count-queue').textContent = sorted.length;
+
+  if (!sorted.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📄</div><p>No articles in the queue yet.</p><p style="margin-top:6px;">Be the first to suggest one!</p></div>`;
+    return;
+  }
+
+  // Track existing card IDs to animate new ones
+  const existingIds = new Set([...list.querySelectorAll('.article-card')].map(el => el.dataset.id));
+
+  list.innerHTML = sorted.map(art => {
+    const votes = art.votes || {};
+    const vKey = userName.replace(/[^a-zA-Z0-9]/g, '_');
+    const voted = !!votes[vKey];
+    const count = Object.keys(votes).length;
+    const voterNames = Object.keys(votes).map(k => k.replace(/_/g, ' ')).join(', ');
+    const voterTag = count ? `<span class="tag tag-suggested">${esc(voterNames)} voted</span>` : '';
+    const dateTag  = art.date ? `<span class="tag tag-date">📅 ${formatDate(art.date)}</span>` : '';
+    const isNew    = !existingIds.has(art.id) && !isInitialLoad;
+
+    return `<div class="article-card${isNew ? ' new-card' : ''}" data-id="${art.id}">
+      <div class="vote-block">
+        <button class="vote-btn${voted ? ' voted' : ''}" onclick="toggleVote('${art.id}')" title="${voted ? 'Remove vote' : 'Vote'}">
+          ${voted ? '▲' : '△'}
+        </button>
+        <span class="vote-count">${count}</span>
+        <span class="vote-label">votes</span>
+      </div>
+      <div class="article-body">
+        <div class="article-title">${esc(art.title)}</div>
+        <div class="article-meta">
+          <a class="article-link" href="${esc(art.link)}" target="_blank" rel="noopener">${shortenUrl(art.link)}</a>
+          ${art.authors ? `<span style="font-size:12px;color:var(--text-dim);">${esc(art.authors)}</span>` : ''}
+          ${art.journal ? `<span style="font-size:12px;color:var(--text-dim);">${esc(art.journal)}</span>` : ''}
+        </div>
+        ${art.notes ? `<div class="article-notes">${esc(art.notes)}</div>` : ''}
+        <div class="article-footer">
+          ${dateTag}${voterTag}
+          <span class="tag tag-suggester">by ${esc(art.suggestedBy)}</span>
+        </div>
+      </div>
+      <div class="article-actions">
+        <button class="btn btn-success" onclick="promptArchive('${art.id}')" style="font-size:12px;padding:5px 10px;">✓ Discussed</button>
+        <button class="btn btn-danger"  onclick="promptDelete('${art.id}')"  style="font-size:12px;padding:5px 10px;">Remove</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER ARCHIVE
+═══════════════════════════════════════════════════ */
+function renderArchive() {
+  const list = document.getElementById('archive-list');
+  const arr  = Object.entries(archive).map(([id, a]) => ({ id, ...a }))
+                 .sort((a,b) => (b.discussedOn || '').localeCompare(a.discussedOn || ''));
+  document.getElementById('count-archive').textContent = arr.length;
+
+  if (!arr.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🗂️</div><p>No archived articles yet.</p><p style="margin-top:6px;">Articles moved here after discussion.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = arr.map(art => `
+    <div class="archive-card">
+      <div>
+        <div class="article-title" style="font-size:0.95rem;">${esc(art.title)}</div>
+        <div class="archive-meta">
+          <a class="article-link" href="${esc(art.link)}" target="_blank" rel="noopener">${shortenUrl(art.link)}</a>
+          ${art.authors ? `<span style="font-size:12px;color:var(--text-dim);">${esc(art.authors)}</span>` : ''}
+          ${art.journal ? `<span style="font-size:12px;color:var(--text-dim);">${esc(art.journal)}</span>` : ''}
+        </div>
+        ${art.notes ? `<div class="article-notes" style="margin-top:6px;">${esc(art.notes)}</div>` : ''}
+        <div class="article-footer" style="margin-top:6px;">
+          <span class="tag tag-suggester">by ${esc(art.suggestedBy)}</span>
+          <span class="vote-archive">▲ ${voteCount(art)} vote${voteCount(art) !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
+      <div><span class="archive-date-badge">Discussed ${formatDate(art.discussedOn)}</span></div>
+    </div>`).join('');
+}
+
+/* ═══════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════ */
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (id === 'archive-modal') pendingArchiveId = null;
+  if (id === 'delete-modal')  pendingDeleteId  = null;
+}
+
+function esc(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function shortenUrl(url) {
+  try {
+    const u = new URL(url);
+    let s = u.hostname.replace('www.','') + u.pathname;
+    return s.length > 45 ? s.slice(0,42) + '…' : s;
+  } catch(e) { return (url||'').slice(0,45); }
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  try {
+    const [y,m,day] = d.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
+  } catch(e) { return d; }
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+/* ═══════════════════════════════════════════════════
+   MODAL OVERLAY CLICKS
+═══════════════════════════════════════════════════ */
+['archive-modal','delete-modal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal(id);
+  });
+});
+
+document.getElementById('pw-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') checkPassword();
+});
+
+/* ═══════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════ */
+function init() {
+  // Load persisted prefs
+  userName = localStorage.getItem(NAME_KEY) || '';
+  sortMode = localStorage.getItem(SORT_KEY) || 'votes';
+
+  // Update sort UI
+  ['votes','date','new'].forEach(m => {
+    document.getElementById('sort-'+m).classList.toggle('active', m === sortMode);
+  });
+
+  // Name banner
+  if (userName) document.getElementById('name-banner').style.display = 'none';
+  else document.getElementById('name-input').value = '';
+
+  // Firebase
+  loadConfig();
+  if (cfg && cfg.dbUrl && cfg.apiKey) {
+    connectFirebase();
+  } else {
+    showSetupPrompt();
+  }
+}
+
+// Entry point — check session auth first
+(function boot() {
+  loadConfig();
+  const authed = sessionStorage.getItem(AUTH_KEY);
+  if (authed === '1') {
+    document.getElementById('lock-screen').classList.add('hidden');
+    init();
+  } else {
+    document.getElementById('pw-input').focus();
+  }
+})();
+</script>
+</body>
+</html>
