@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lab Journal Club</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -60,32 +63,6 @@
     display: none;
   }
   .lock-error.show { display: block; }
-
-  /* ── SETUP SCREEN ── */
-  #setup-screen {
-    position: fixed; inset: 0; background: rgba(20,18,14,0.6);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 8888; padding: 1rem;
-  }
-  #setup-screen.hidden { display: none; }
-  .setup-box {
-    background: var(--surface); border-radius: 8px; padding: 2rem;
-    width: 100%; max-width: 520px; box-shadow: 0 12px 40px rgba(0,0,0,0.2);
-  }
-  .setup-title { font-family: 'Playfair Display', serif; font-size: 1.2rem; margin-bottom: 0.4rem; }
-  .setup-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6; }
-  .setup-field { margin-bottom: 0.85rem; }
-  .setup-field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; }
-  .setup-field input {
-    width: 100%; font-family: 'IBM Plex Mono', monospace; font-size: 13px;
-    padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
-    background: var(--bg); color: var(--text);
-  }
-  .setup-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(29,58,94,0.1); background: white; }
-  .setup-hint { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
-  .setup-footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-light); }
-  .setup-error { font-size: 13px; color: var(--red); margin-top: 0.75rem; display: none; }
-  .setup-error.show { display: block; }
 
   /* ── TOAST ── */
   #toast {
@@ -288,38 +265,6 @@
   </div>
 </div>
 
-<!-- ── SETUP SCREEN (first-time Firebase config) ── -->
-<div id="setup-screen" class="hidden">
-  <div class="setup-box">
-    <div class="setup-title">One-time Firebase Setup</div>
-    <div class="setup-desc">
-      To enable real-time sync, you need a free Firebase Realtime Database.
-      Create one at <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent);">console.firebase.google.com</a>
-      → New project → Realtime Database → Start in <strong>test mode</strong>. Then paste your config below.
-      This is saved in your browser and shared via the URL hash for teammates.
-    </div>
-    <div class="setup-field">
-      <label>Database URL</label>
-      <input type="url" id="cfg-url" placeholder="https://your-project-default-rtdb.firebaseio.com">
-      <div class="setup-hint">Found in Firebase Console → Realtime Database → Data tab</div>
-    </div>
-    <div class="setup-field">
-      <label>API Key</label>
-      <input type="text" id="cfg-key" placeholder="AIzaSy...">
-      <div class="setup-hint">Found in Project Settings → General → Web API Key</div>
-    </div>
-    <div class="setup-field">
-      <label>Page Password</label>
-      <input type="text" id="cfg-pw" placeholder="Choose a password for your lab">
-    </div>
-    <div class="setup-error" id="setup-error"></div>
-    <div class="setup-footer">
-      <button class="btn btn-outline" onclick="dismissSetup()">Skip (use local only)</button>
-      <button class="btn btn-success" onclick="saveSetup()">Connect & Save</button>
-    </div>
-  </div>
-</div>
-
 <!-- ── TOAST ── -->
 <div id="toast"></div>
 
@@ -455,7 +400,7 @@ const AUTH_KEY   = 'jc_authed';
 
 // PASSWORD — change this string to set your lab password.
 // If you use Firebase, the password is also stored in the setup config.
-const DEFAULT_PASSWORD = 'abcde';
+const DEFAULT_PASSWORD = '__JC_PASSWORD__';
 
 let cfg = null;       // { dbUrl, apiKey, password }
 let db  = null;       // Firebase database ref
@@ -496,30 +441,11 @@ function loadConfig() {
   try { cfg = JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch(e) { cfg = null; }
 }
 
-function saveSetup() {
-  const url = document.getElementById('cfg-url').value.trim();
-  const key = document.getElementById('cfg-key').value.trim();
-  const pw  = document.getElementById('cfg-pw').value.trim();
-  const err = document.getElementById('setup-error');
-  if (!url || !key) { err.textContent = 'Database URL and API Key are required.'; err.classList.add('show'); return; }
-  cfg = { dbUrl: url, apiKey: key, password: pw || DEFAULT_PASSWORD };
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
-  err.classList.remove('show');
-  document.getElementById('setup-screen').classList.add('hidden');
-  connectFirebase();
-}
 
-function dismissSetup() {
-  document.getElementById('setup-screen').classList.add('hidden');
-  setSyncStatus('error', 'local only');
-  renderQueue();
-  renderArchive();
-}
 
 function connectFirebase() {
   if (!cfg || !cfg.dbUrl || !cfg.apiKey) {
-    setSyncStatus('error', 'not configured');
-    showSetupPrompt();
+    setSyncStatus('error', 'config missing — check GitHub secrets');
     return;
   }
   try {
@@ -538,15 +464,6 @@ function connectFirebase() {
   }
 }
 
-function showSetupPrompt() {
-  // Pre-fill if we have partial config
-  if (cfg) {
-    document.getElementById('cfg-url').value = cfg.dbUrl || '';
-    document.getElementById('cfg-key').value = cfg.apiKey || '';
-    document.getElementById('cfg-pw').value  = cfg.password || '';
-  }
-  document.getElementById('setup-screen').classList.remove('hidden');
-}
 
 /* ═══════════════════════════════════════════════════
    REAL-TIME SUBSCRIPTIONS
@@ -924,18 +841,21 @@ function init() {
   if (userName) document.getElementById('name-banner').style.display = 'none';
   else document.getElementById('name-input').value = '';
 
-  // Firebase
-  loadConfig();
-  if (cfg && cfg.dbUrl && cfg.apiKey) {
-    connectFirebase();
-  } else {
-    showSetupPrompt();
-  }
+  // Firebase — cfg already set by boot()
+  connectFirebase();
 }
 
 // Entry point — check session auth first
 (function boot() {
-  loadConfig();
+  // Hardcoded config injected at deploy time by GitHub Actions
+  cfg = {
+    apiKey:   '__FIREBASE_API_KEY__',
+    dbUrl:    '__FIREBASE_DB_URL__',
+    password: '__JC_PASSWORD__'
+  };
+  // Save to localStorage so the rest of the app finds it normally
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+
   const authed = sessionStorage.getItem(AUTH_KEY);
   if (authed === '1') {
     document.getElementById('lock-screen').classList.add('hidden');
