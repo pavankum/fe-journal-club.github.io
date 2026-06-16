@@ -29,6 +29,7 @@ jobs:
       - name: Send Slack notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SITE_URL: ${{ secrets.SITE_URL }}
         run: |
           TITLE="${{ github.event.inputs.article_title }}"
           LINK="${{ github.event.inputs.article_link }}"
@@ -59,7 +60,10 @@ jobs:
             BLOCKS="$BLOCKS, {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"*Notes*\n$NOTES\"}}"
           fi
 
-          BLOCKS="$BLOCKS, {\"type\": \"divider\"}]"
+          BLOCKS="$BLOCKS, {\"type\": \"divider\"},
+            {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"<$SITE_URL|👆 Vote on this article>\"}}"
+
+          BLOCKS="$BLOCKS]"
 
           curl -s -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
