@@ -540,24 +540,40 @@ function showTab(tab) {
 ═══════════════════════════════════════════════════ */
 async function notifySlack(article) {
   const { ejsPublicKey, ejsServiceId, ejsTemplateId } = cfg || {};
-  if (!ejsPublicKey || ejsPublicKey === '__EMAILJS_PUBLIC_KEY__') return;
+  console.log('[notifySlack] keys:', ejsPublicKey, ejsServiceId, ejsTemplateId);
+  if (!ejsPublicKey || ejsPublicKey === '__EMAILJS_PUBLIC_KEY__') {
+    console.warn('[notifySlack] missing public key, aborting');
+    return;
+  }
+  if (!ejsServiceId || ejsServiceId === '__EMAILJS_SERVICE_ID__') {
+    console.warn('[notifySlack] missing service ID, aborting');
+    return;
+  }
+  if (!ejsTemplateId || ejsTemplateId === '__EMAILJS_TEMPLATE_ID__') {
+    console.warn('[notifySlack] missing template ID, aborting');
+    return;
+  }
+
   emailjs.init({ publicKey: ejsPublicKey });
 
   const dateStr = article.date ? formatDate(article.date) : 'Not set';
   const meta    = [article.authors, article.journal].filter(Boolean).join(' · ') || 'Not specified';
 
+  const params = {
+    article_title:   article.title,
+    article_link:    article.link,
+    suggested_by:    article.suggestedBy || 'Anonymous',
+    article_authors: meta,
+    proposed_date:   dateStr,
+    article_notes:   article.notes || '—',
+  };
+  console.log('[notifySlack] sending with params:', params);
+
   try {
-    await emailjs.send(ejsServiceId, ejsTemplateId, {
-      article_title:   article.title,
-      article_link:    article.link,
-      suggested_by:    article.suggestedBy || 'Anonymous',
-      article_authors: meta,
-      proposed_date:   dateStr,
-      article_notes:   article.notes || '—',
-    });
-    console.log('Slack notified via EmailJS');
+    const result = await emailjs.send(ejsServiceId, ejsTemplateId, params);
+    console.log('[notifySlack] SUCCESS:', result);
   } catch(e) {
-    console.warn('EmailJS notification failed (non-critical):', e);
+    console.error('[notifySlack] FAILED:', e);
   }
 }
 
