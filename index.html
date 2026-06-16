@@ -541,7 +541,6 @@ function showTab(tab) {
 ═══════════════════════════════════════════════════ */
 async function notifySlack(article) {
   const { ejsPublicKey, ejsServiceId, ejsTemplateId } = cfg || {};
-  console.log('[notifySlack] keys:', ejsPublicKey, ejsServiceId, ejsTemplateId);
   // Guard: check keys look real (injected values are never this short)
   if (!ejsPublicKey || ejsPublicKey.length < 10) {
     console.warn('[notifySlack] missing public key, aborting');
@@ -569,11 +568,10 @@ async function notifySlack(article) {
     proposed_date:   dateStr,
     article_notes:   article.notes || '—',
   };
-  console.log('[notifySlack] sending with params:', params);
 
   try {
     const result = await emailjs.send(ejsServiceId, ejsTemplateId, params);
-    console.log('[notifySlack] SUCCESS:', result);
+    console.log('Slack notified via EmailJS ✓');
   } catch(e) {
     console.error('[notifySlack] FAILED:', e);
   }
@@ -919,11 +917,6 @@ function init() {
   };
   // Save to localStorage so the rest of the app finds it normally
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
-
-  // Debug: confirm secrets injected (safe — only shows first 8 chars)
-  console.log('[boot] ejsPublicKey:', cfg.ejsPublicKey ? cfg.ejsPublicKey.slice(0,8)+'...' : 'MISSING');
-  console.log('[boot] ejsServiceId:', cfg.ejsServiceId || 'MISSING');
-  console.log('[boot] ejsTemplateId:', cfg.ejsTemplateId || 'MISSING');
 
   const authed = sessionStorage.getItem(AUTH_KEY);
   if (authed === '1') {
