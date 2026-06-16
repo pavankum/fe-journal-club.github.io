@@ -29,7 +29,6 @@ jobs:
       - name: Send Slack notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SITE_URL: ${{ secrets.SITE_URL }}
         run: |
           TITLE="${{ github.event.inputs.article_title }}"
           LINK="${{ github.event.inputs.article_link }}"
@@ -37,6 +36,7 @@ jobs:
           AUTHORS="${{ github.event.inputs.article_authors }}"
           DATE="${{ github.event.inputs.proposed_date }}"
           NOTES="${{ github.event.inputs.article_notes }}"
+          SITE="https://pavankum.github.io/fe-journal-club.github.io/"
 
           # Build fields array conditionally
           FIELDS="[
@@ -60,10 +60,10 @@ jobs:
             BLOCKS="$BLOCKS, {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"*Notes*\n$NOTES\"}}"
           fi
 
-          BLOCKS="$BLOCKS, {\"type\": \"divider\"},
-            {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"<$SITE_URL|👆 Vote on this article>\"}}"
-
-          BLOCKS="$BLOCKS]"
+          BLOCKS="$BLOCKS,
+            {\"type\": \"divider\"},
+            {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"<$SITE|👆 Vote on this article>\"}}
+          ]"
 
           curl -s -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
