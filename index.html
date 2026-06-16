@@ -541,6 +541,7 @@ function showTab(tab) {
 async function notifySlack(article) {
   const { ejsPublicKey, ejsServiceId, ejsTemplateId } = cfg || {};
   if (!ejsPublicKey || ejsPublicKey === '__EMAILJS_PUBLIC_KEY__') return;
+  emailjs.init({ publicKey: ejsPublicKey });
 
   const dateStr = article.date ? formatDate(article.date) : 'Not set';
   const meta    = [article.authors, article.journal].filter(Boolean).join(' · ') || 'Not specified';
@@ -890,10 +891,7 @@ function init() {
   // Save to localStorage so the rest of the app finds it normally
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
 
-  // Init EmailJS
-  if (cfg.ejsPublicKey && cfg.ejsPublicKey !== '__EMAILJS_PUBLIC_KEY__') {
-    emailjs.init({ publicKey: cfg.ejsPublicKey });
-  }
+
 
   const authed = sessionStorage.getItem(AUTH_KEY);
   if (authed === '1') {
