@@ -385,6 +385,9 @@
   </div>
 </div>
 
+<!-- EmailJS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
 <!-- Firebase SDK v9 compat -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -531,49 +534,29 @@ function showTab(tab) {
 }
 
 
+
 /* ═══════════════════════════════════════════════════
-   SLACK NOTIFICATION
+   SLACK NOTIFICATION VIA EMAILJS
 ═══════════════════════════════════════════════════ */
-async function sendSlackNotification(article) {
-  const webhook = cfg && cfg.slackWebhook;
-  if (!webhook || webhook === '__SLACK_WEBHOOK_URL__') return; // not configured
-  const dateStr = article.date ? ` · 📅 ${formatDate(article.date)}` : '';
-  const metaStr = [article.authors, article.journal].filter(Boolean).join(' · ');
-  const blocks = [
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `📄 *New article suggested for journal club*`
-      }
-    },
-    {
-      type: 'section',
-      fields: [
-        { type: 'mrkdwn', text: `*Title*\n<${article.link}|${article.title}>` },
-        { type: 'mrkdwn', text: `*Suggested by*\n${article.suggestedBy}` },
-        ...(metaStr ? [{ type: 'mrkdwn', text: `*Details*\n${metaStr}` }] : []),
-        ...(article.date ? [{ type: 'mrkdwn', text: `*Proposed date*\n${formatDate(article.date)}` }] : []),
-      ]
-    },
-    ...(article.notes ? [{
-      type: 'section',
-      text: { type: 'mrkdwn', text: `*Notes*\n${article.notes}` }
-    }] : []),
-    {
-      type: 'context',
-      elements: [{ type: 'mrkdwn', text: `Posted from Lab Journal Club` }]
-    }
-  ];
+async function notifySlack(article) {
+  const { ejsPublicKey, ejsServiceId, ejsTemplateId } = cfg || {};
+  if (!ejsPublicKey || ejsPublicKey === '__EMAILJS_PUBLIC_KEY__') return;
+
+  const dateStr = article.date ? formatDate(article.date) : 'Not set';
+  const meta    = [article.authors, article.journal].filter(Boolean).join(' · ') || 'Not specified';
 
   try {
-    await fetch(webhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ blocks })
+    await emailjs.send(ejsServiceId, ejsTemplateId, {
+      article_title:   article.title,
+      article_link:    article.link,
+      suggested_by:    article.suggestedBy || 'Anonymous',
+      article_authors: meta,
+      proposed_date:   dateStr,
+      article_notes:   article.notes || '—',
     });
+    console.log('Slack notified via EmailJS');
   } catch(e) {
-    console.warn('Slack notification failed (non-critical):', e);
+    console.warn('EmailJS notification failed (non-critical):', e);
   }
 }
 
@@ -619,7 +602,7 @@ async function submitArticle() {
   }
   closeAddForm();
   toast('Article submitted!');
-  sendSlackNotification(article);
+  notifySlack(article);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -897,13 +880,20 @@ function init() {
 (function boot() {
   // Hardcoded config injected at deploy time by GitHub Actions
   cfg = {
-    apiKey:       '__FIREBASE_API_KEY__',
-    dbUrl:        '__FIREBASE_DB_URL__',
-    password:     '__JC_PASSWORD__',
-    slackWebhook: '__SLACK_WEBHOOK_URL__'
+    apiKey:            '__FIREBASE_API_KEY__',
+    dbUrl:             '__FIREBASE_DB_URL__',
+    password:          '__JC_PASSWORD__',
+    ejsPublicKey:      '__EMAILJS_PUBLIC_KEY__',
+    ejsServiceId:      '__EMAILJS_SERVICE_ID__',
+    ejsTemplateId:     '__EMAILJS_TEMPLATE_ID__'
   };
   // Save to localStorage so the rest of the app finds it normally
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+
+  // Init EmailJS
+  if (cfg.ejsPublicKey && cfg.ejsPublicKey !== '__EMAILJS_PUBLIC_KEY__') {
+    emailjs.init({ publicKey: cfg.ejsPublicKey });
+  }
 
   const authed = sessionStorage.getItem(AUTH_KEY);
   if (authed === '1') {
