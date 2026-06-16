@@ -260,7 +260,7 @@
       <div class="lock-label">Password</div>
       <input class="lock-input" type="password" id="pw-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkPassword()">
     </div>
-    <div class="lock-error" id="lock-error">Incorrect password. try again.</div>
+    <div class="lock-error" id="lock-error">Incorrect password. Try again.</div>
     <button class="lock-btn" onclick="checkPassword()">Enter →</button>
   </div>
 </div>
@@ -385,6 +385,7 @@
   </div>
 </div>
 
+<!-- BUILD: 20260616-0226 -->
 <!-- EmailJS SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
@@ -541,15 +542,16 @@ function showTab(tab) {
 async function notifySlack(article) {
   const { ejsPublicKey, ejsServiceId, ejsTemplateId } = cfg || {};
   console.log('[notifySlack] keys:', ejsPublicKey, ejsServiceId, ejsTemplateId);
-  if (!ejsPublicKey || ejsPublicKey === '__EMAILJS_PUBLIC_KEY__') {
+  // Guard: check keys look real (injected values are never this short)
+  if (!ejsPublicKey || ejsPublicKey.length < 10) {
     console.warn('[notifySlack] missing public key, aborting');
     return;
   }
-  if (!ejsServiceId || ejsServiceId === '__EMAILJS_SERVICE_ID__') {
+  if (!ejsServiceId || ejsServiceId.length < 5) {
     console.warn('[notifySlack] missing service ID, aborting');
     return;
   }
-  if (!ejsTemplateId || ejsTemplateId === '__EMAILJS_TEMPLATE_ID__') {
+  if (!ejsTemplateId || ejsTemplateId.length < 5) {
     console.warn('[notifySlack] missing template ID, aborting');
     return;
   }
@@ -889,7 +891,18 @@ function init() {
   if (userName) document.getElementById('name-banner').style.display = 'none';
   else document.getElementById('name-input').value = '';
 
-  // Firebase — cfg already set by boot()
+  // Firebase — merge boot() injected values over anything from localStorage
+  // This ensures injected secrets always win over stale cached values
+  const injected = {
+    apiKey:        '__FIREBASE_API_KEY__',
+    dbUrl:         '__FIREBASE_DB_URL__',
+    password:      '__JC_PASSWORD__',
+    ejsPublicKey:  '__EMAILJS_PUBLIC_KEY__',
+    ejsServiceId:  '__EMAILJS_SERVICE_ID__',
+    ejsTemplateId: '__EMAILJS_TEMPLATE_ID__'
+  };
+  cfg = Object.assign({}, cfg, injected);
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
   connectFirebase();
 }
 
@@ -907,7 +920,10 @@ function init() {
   // Save to localStorage so the rest of the app finds it normally
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
 
-
+  // Debug: confirm secrets injected (safe — only shows first 8 chars)
+  console.log('[boot] ejsPublicKey:', cfg.ejsPublicKey ? cfg.ejsPublicKey.slice(0,8)+'...' : 'MISSING');
+  console.log('[boot] ejsServiceId:', cfg.ejsServiceId || 'MISSING');
+  console.log('[boot] ejsTemplateId:', cfg.ejsTemplateId || 'MISSING');
 
   const authed = sessionStorage.getItem(AUTH_KEY);
   if (authed === '1') {
