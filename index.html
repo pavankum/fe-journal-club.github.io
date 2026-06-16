@@ -386,9 +386,6 @@
 </div>
 
 <!-- BUILD: 20260616-0226 -->
-<!-- EmailJS SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-
 <!-- Firebase SDK v9 compat -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -537,43 +534,41 @@ function showTab(tab) {
 
 
 /* ═══════════════════════════════════════════════════
-   SLACK NOTIFICATION VIA EMAILJS
+   SLACK NOTIFICATION VIA GITHUB ACTIONS
 ═══════════════════════════════════════════════════ */
 async function notifySlack(article) {
-  const { ejsPublicKey, ejsServiceId, ejsTemplateId } = cfg || {};
-  // Guard: check keys look real (injected values are never this short)
-  if (!ejsPublicKey || ejsPublicKey.length < 10) {
-    console.warn('[notifySlack] missing public key, aborting');
-    return;
-  }
-  if (!ejsServiceId || ejsServiceId.length < 5) {
-    console.warn('[notifySlack] missing service ID, aborting');
-    return;
-  }
-  if (!ejsTemplateId || ejsTemplateId.length < 5) {
-    console.warn('[notifySlack] missing template ID, aborting');
-    return;
-  }
+  const { ghToken, ghRepo } = cfg || {};
+  if (!ghToken || ghToken.length < 10) return;
+  if (!ghRepo  || ghRepo.length  < 3)  return;
 
-  emailjs.init({ publicKey: ejsPublicKey });
-
-  const dateStr = article.date ? formatDate(article.date) : 'Not set';
-  const meta    = [article.authors, article.journal].filter(Boolean).join(' · ') || 'Not specified';
-
-  const params = {
-    article_title:   article.title,
-    article_link:    article.link,
-    suggested_by:    article.suggestedBy || 'Anonymous',
-    article_authors: meta,
-    proposed_date:   dateStr,
-    article_notes:   article.notes || '—',
-  };
+  const dateStr = article.date ? formatDate(article.date) : '';
+  const meta    = [article.authors, article.journal].filter(Boolean).join(' · ');
 
   try {
-    const result = await emailjs.send(ejsServiceId, ejsTemplateId, params);
-    console.log('Slack notified via EmailJS ✓');
+    const res = await fetch(`https://api.github.com/repos/${ghRepo}/actions/workflows/slack-notify.yml/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${ghToken}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      },
+      body: JSON.stringify({
+        ref: 'main',
+        inputs: {
+          article_title:   article.title        || '',
+          article_link:    article.link         || '',
+          suggested_by:    article.suggestedBy  || 'Anonymous',
+          article_authors: meta                 || '',
+          proposed_date:   dateStr              || '',
+          article_notes:   article.notes        || ''
+        }
+      })
+    });
+    if (res.status === 204) console.log('Slack workflow triggered ✓');
+    else console.warn('[notifySlack] unexpected status:', res.status);
   } catch(e) {
-    console.error('[notifySlack] FAILED:', e);
+    console.warn('[notifySlack] FAILED:', e);
   }
 }
 
@@ -911,9 +906,8 @@ function init() {
     apiKey:            '__FIREBASE_API_KEY__',
     dbUrl:             '__FIREBASE_DB_URL__',
     password:          '__JC_PASSWORD__',
-    ejsPublicKey:      '__EMAILJS_PUBLIC_KEY__',
-    ejsServiceId:      '__EMAILJS_SERVICE_ID__',
-    ejsTemplateId:     '__EMAILJS_TEMPLATE_ID__'
+    ghToken:   '__GH_PAT_TOKEN__',
+    ghRepo:    '__GH_REPO__'
   };
   // Save to localStorage so the rest of the app finds it normally
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
