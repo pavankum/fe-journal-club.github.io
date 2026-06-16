@@ -530,6 +530,53 @@ function showTab(tab) {
   if (tab === 'queue')   closeAddForm();
 }
 
+
+/* ═══════════════════════════════════════════════════
+   SLACK NOTIFICATION
+═══════════════════════════════════════════════════ */
+async function sendSlackNotification(article) {
+  const webhook = cfg && cfg.slackWebhook;
+  if (!webhook || webhook === '__SLACK_WEBHOOK_URL__') return; // not configured
+  const dateStr = article.date ? ` · 📅 ${formatDate(article.date)}` : '';
+  const metaStr = [article.authors, article.journal].filter(Boolean).join(' · ');
+  const blocks = [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `📄 *New article suggested for journal club*`
+      }
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Title*\n<${article.link}|${article.title}>` },
+        { type: 'mrkdwn', text: `*Suggested by*\n${article.suggestedBy}` },
+        ...(metaStr ? [{ type: 'mrkdwn', text: `*Details*\n${metaStr}` }] : []),
+        ...(article.date ? [{ type: 'mrkdwn', text: `*Proposed date*\n${formatDate(article.date)}` }] : []),
+      ]
+    },
+    ...(article.notes ? [{
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*Notes*\n${article.notes}` }
+    }] : []),
+    {
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: `Posted from Lab Journal Club` }]
+    }
+  ];
+
+  try {
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocks })
+    });
+  } catch(e) {
+    console.warn('Slack notification failed (non-critical):', e);
+  }
+}
+
 /* ═══════════════════════════════════════════════════
    ADD FORM
 ═══════════════════════════════════════════════════ */
@@ -572,6 +619,7 @@ async function submitArticle() {
   }
   closeAddForm();
   toast('Article submitted!');
+  sendSlackNotification(article);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -849,9 +897,10 @@ function init() {
 (function boot() {
   // Hardcoded config injected at deploy time by GitHub Actions
   cfg = {
-    apiKey:   '__FIREBASE_API_KEY__',
-    dbUrl:    '__FIREBASE_DB_URL__',
-    password: '__JC_PASSWORD__'
+    apiKey:       '__FIREBASE_API_KEY__',
+    dbUrl:        '__FIREBASE_DB_URL__',
+    password:     '__JC_PASSWORD__',
+    slackWebhook: '__SLACK_WEBHOOK_URL__'
   };
   // Save to localStorage so the rest of the app finds it normally
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
