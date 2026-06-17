@@ -29,42 +29,51 @@ jobs:
       - name: Send Slack notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          ARTICLE_TITLE:   ${{ github.event.inputs.article_title }}
+          ARTICLE_LINK:    ${{ github.event.inputs.article_link }}
+          SUGGESTED_BY:    ${{ github.event.inputs.suggested_by }}
+          ARTICLE_AUTHORS: ${{ github.event.inputs.article_authors }}
+          PROPOSED_DATE:   ${{ github.event.inputs.proposed_date }}
+          ARTICLE_NOTES:   ${{ github.event.inputs.article_notes }}
         run: |
-          TITLE="${{ github.event.inputs.article_title }}"
-          LINK="${{ github.event.inputs.article_link }}"
-          BY="${{ github.event.inputs.suggested_by }}"
-          AUTHORS="${{ github.event.inputs.article_authors }}"
-          DATE="${{ github.event.inputs.proposed_date }}"
-          NOTES="${{ github.event.inputs.article_notes }}"
           SITE="https://pavankum.github.io/fe-journal-club.github.io/"
 
-          # Build fields array conditionally
-          FIELDS="[
-            {\"type\": \"mrkdwn\", \"text\": \"*Title*\n<$LINK|$TITLE>\"},
-            {\"type\": \"mrkdwn\", \"text\": \"*Suggested by*\n$BY\"}"
+          # Use python to safely build JSON — avoids all shell escaping issues
+          python3 - <<PYEOF
+          import json, os, urllib.request
 
-          if [ -n "$AUTHORS" ]; then
-            FIELDS="$FIELDS, {\"type\": \"mrkdwn\", \"text\": \"*Authors / Journal*\n$AUTHORS\"}"
-          fi
-          if [ -n "$DATE" ]; then
-            FIELDS="$FIELDS, {\"type\": \"mrkdwn\", \"text\": \"*Proposed date*\n$DATE\"}"
-          fi
-          FIELDS="$FIELDS]"
+          title   = os.environ.get('ARTICLE_TITLE', '')
+          link    = os.environ.get('ARTICLE_LINK', '')
+          by      = os.environ.get('SUGGESTED_BY', 'Anonymous')
+          authors = os.environ.get('ARTICLE_AUTHORS', '')
+          date    = os.environ.get('PROPOSED_DATE', '')
+          notes   = os.environ.get('ARTICLE_NOTES', '')
+          site    = os.environ.get('SITE', '')
+          webhook = os.environ.get('SLACK_WEBHOOK_URL', '')
 
-          # Build blocks
-          BLOCKS="[
-            {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"📄 *New article suggested for journal club*\"}},
-            {\"type\": \"section\", \"fields\": $FIELDS}"
+          fields = [
+            {"type": "mrkdwn", "text": f"*Title*\n<{link}|{title}>"},
+            {"type": "mrkdwn", "text": f"*Suggested by*\n{by}"},
+          ]
+          if authors:
+            fields.append({"type": "mrkdwn", "text": f"*Authors / Journal*\n{authors}"})
+          if date:
+            fields.append({"type": "mrkdwn", "text": f"*Proposed date*\n{date}"})
 
-          if [ -n "$NOTES" ]; then
-            BLOCKS="$BLOCKS, {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"*Notes*\n$NOTES\"}}"
-          fi
+          blocks = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": "📄 *New article suggested for journal club*"}},
+            {"type": "section", "fields": fields},
+          ]
+          if notes:
+            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Notes*\n{notes}"}})
 
-          BLOCKS="$BLOCKS,
-            {\"type\": \"divider\"},
-            {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"<$SITE|👆 Vote on this article>\"}}
-          ]"
+          blocks.append({"type": "divider"})
+          blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"<{site}|👆 Vote on this article>"}})
 
-          curl -s -X POST "$SLACK_WEBHOOK_URL" \
-            -H 'Content-Type: application/json' \
-            -d "{\"blocks\": $BLOCKS}"
+          payload = json.dumps({"blocks": blocks}).encode()
+          req = urllib.request.Request(webhook, data=payload, headers={"Content-Type": "application/json"})
+          res = urllib.request.urlopen(req)
+          print(f"Slack responded: {res.status}")
+          PYEOF
+        env:
+          SITE: "https://pavankum.github.io/fe-journal-club.github.io/"
