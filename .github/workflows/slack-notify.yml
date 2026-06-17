@@ -29,17 +29,15 @@ jobs:
       - name: Send Slack notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          ARTICLE_TITLE:   ${{ github.event.inputs.article_title }}
-          ARTICLE_LINK:    ${{ github.event.inputs.article_link }}
-          SUGGESTED_BY:    ${{ github.event.inputs.suggested_by }}
-          ARTICLE_AUTHORS: ${{ github.event.inputs.article_authors }}
-          PROPOSED_DATE:   ${{ github.event.inputs.proposed_date }}
-          ARTICLE_NOTES:   ${{ github.event.inputs.article_notes }}
+          ARTICLE_TITLE:     ${{ github.event.inputs.article_title }}
+          ARTICLE_LINK:      ${{ github.event.inputs.article_link }}
+          SUGGESTED_BY:      ${{ github.event.inputs.suggested_by }}
+          ARTICLE_AUTHORS:   ${{ github.event.inputs.article_authors }}
+          PROPOSED_DATE:     ${{ github.event.inputs.proposed_date }}
+          ARTICLE_NOTES:     ${{ github.event.inputs.article_notes }}
+          SITE:              "https://pavankum.github.io/fe-journal-club.github.io/"
         run: |
-          SITE="https://pavankum.github.io/fe-journal-club.github.io/"
-
-          # Use python to safely build JSON — avoids all shell escaping issues
-          python3 - <<PYEOF
+          python3 - <<'PYEOF'
           import json, os, urllib.request
 
           title   = os.environ.get('ARTICLE_TITLE', '')
@@ -75,5 +73,3 @@ jobs:
           res = urllib.request.urlopen(req)
           print(f"Slack responded: {res.status}")
           PYEOF
-        env:
-          SITE: "https://pavankum.github.io/fe-journal-club.github.io/"
