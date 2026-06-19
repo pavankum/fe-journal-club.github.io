@@ -1,0 +1,72 @@
+name: Weekly Slack Digest
+
+on:
+  schedule:
+    # 9:00 AM PT Monday = 16:00 UTC (adjust for your timezone / DST)
+    - cron: '0 16 * * 1'
+  workflow_dispatch: {}   # allows manual trigger from Actions tab for testing
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and send digest
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          FIREBASE_DB_URL:   ${{ secrets.FIREBASE_DB_URL }}
+          SITE_URL:          "https://pavankum.github.io/fe-journal-club.github.io/"
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, urllib.request
+
+          db_url   = os.environ['FIREBASE_DB_URL'].rstrip('/')
+          webhook  = os.environ['SLACK_WEBHOOK_URL']
+          site     = os.environ['SITE_URL']
+
+          # Fetch all articles from Firebase REST API
+          articles_url = f"{db_url}/articles.json"
+          with urllib.request.urlopen(articles_url) as res:
+            data = json.loads(res.read().decode()) or {}
+
+          # Build a list of (id, article) with vote counts
+          items = []
+          for art_id, art in data.items():
+            votes = art.get('votes') or {}
+            items.append({
+              'id': art_id,
+              'title': art.get('title', 'Untitled'),
+              'link': art.get('link', ''),
+              'suggestedBy': art.get('suggestedBy', 'Anonymous'),
+              'notes': art.get('notes', ''),
+              'voteCount': len(votes),
+            })
+
+          # Sort by votes descending, take top 10
+          items.sort(key=lambda x: x['voteCount'], reverse=True)
+          top = items[:10]
+
+          if not top:
+            blocks = [
+              {"type": "section", "text": {"type": "mrkdwn", "text": "📚 *Weekly Journal Club Digest*\n\nNo articles in the queue this week. Suggest one!"}},
+              {"type": "section", "text": {"type": "mrkdwn", "text": f"<{site}|👉 Open Journal Club>"}}
+            ]
+          else:
+            blocks = [
+              {"type": "section", "text": {"type": "mrkdwn", "text": "📚 *Weekly Journal Club Digest — Top Voted Papers*"}},
+              {"type": "divider"}
+            ]
+            for i, art in enumerate(top, start=1):
+              vote_label = f"{art['voteCount']} vote" + ("s" if art['voteCount'] != 1 else "")
+              text = f"*{i}. <{art['link']}|{art['title']}>*\n▲ {vote_label} · suggested by {art['suggestedBy']}"
+              if art['notes']:
+                text += f"\n_{art['notes']}_"
+              blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text}})
+
+            blocks.append({"type": "divider"})
+            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"<{site}|👆 Vote on these articles>"}})
+
+          payload = json.dumps({"blocks": blocks}).encode()
+          req = urllib.request.Request(webhook, data=payload, headers={"Content-Type": "application/json"})
+          r = urllib.request.urlopen(req)
+          print(f"Slack responded: {r.status}")
+          PYEOF

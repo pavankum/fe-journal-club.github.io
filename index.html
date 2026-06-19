@@ -305,28 +305,20 @@
       <div class="form-title">New Article Suggestion</div>
       <div class="form-row">
         <div class="form-group full">
-          <label>Article Title *</label>
+          <label>Paper Title *</label>
           <input type="text" id="f-title" placeholder="e.g. Attention Is All You Need" maxlength="200">
         </div>
         <div class="form-group full">
-          <label>Link / DOI *</label>
+          <label>Link to Paper *</label>
           <input type="url" id="f-link" placeholder="https://…">
         </div>
-        <div class="form-group">
-          <label>Authors</label>
-          <input type="text" id="f-authors" placeholder="Vaswani et al." maxlength="100">
-        </div>
-        <div class="form-group">
-          <label>Year / Journal</label>
-          <input type="text" id="f-journal" placeholder="2017 · NeurIPS" maxlength="80">
+        <div class="form-group full">
+          <label>Reason to Suggest *</label>
+          <textarea id="f-notes" placeholder="Why should we read this paper?"></textarea>
         </div>
         <div class="form-group full">
-          <label>Notes / Why read this?</label>
-          <textarea id="f-notes" placeholder="Brief note about why this is interesting…"></textarea>
-        </div>
-        <div class="form-group">
-          <label>Suggested discussion date</label>
-          <input type="date" id="f-date">
+          <label>Your Name *</label>
+          <input type="text" id="f-suggester" placeholder="Your name" maxlength="40">
         </div>
       </div>
       <div class="form-footer">
@@ -533,44 +525,6 @@ function showTab(tab) {
 
 
 
-/* ═══════════════════════════════════════════════════
-   SLACK NOTIFICATION VIA GITHUB ACTIONS
-═══════════════════════════════════════════════════ */
-async function notifySlack(article) {
-  const { ghToken, ghRepo } = cfg || {};
-  if (!ghToken || ghToken.length < 10) return;
-  if (!ghRepo  || ghRepo.length  < 3)  return;
-
-  const dateStr = article.date ? formatDate(article.date) : '';
-  const meta    = [article.authors, article.journal].filter(Boolean).join(' · ');
-
-  try {
-    const res = await fetch(`https://api.github.com/repos/${ghRepo}/actions/workflows/slack-notify.yml/dispatches`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${ghToken}`,
-        'Accept': 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': '2022-11-28'
-      },
-      body: JSON.stringify({
-        ref: 'main',
-        inputs: {
-          article_title:   article.title        || '',
-          article_link:    article.link         || '',
-          suggested_by:    article.suggestedBy  || 'Anonymous',
-          article_authors: meta                 || '',
-          proposed_date:   dateStr              || '',
-          article_notes:   article.notes        || ''
-        }
-      })
-    });
-    if (res.status === 204) console.log('Slack workflow triggered ✓');
-    else console.warn('[notifySlack] unexpected status:', res.status);
-  } catch(e) {
-    console.warn('[notifySlack] FAILED:', e);
-  }
-}
 
 /* ═══════════════════════════════════════════════════
    ADD FORM
@@ -582,26 +536,36 @@ function openAddForm() {
 }
 function closeAddForm() {
   document.getElementById('add-form').style.display = 'none';
-  ['f-title','f-link','f-authors','f-journal','f-notes','f-date'].forEach(id => {
+  ['f-title','f-link','f-notes','f-suggester'].forEach(id => {
     document.getElementById(id).value = '';
   });
 }
 
 async function submitArticle() {
-  const title = document.getElementById('f-title').value.trim();
-  const link  = document.getElementById('f-link').value.trim();
-  if (!title) { document.getElementById('f-title').focus(); return; }
-  if (!link)  { document.getElementById('f-link').focus(); return; }
+  const title     = document.getElementById('f-title').value.trim();
+  const link      = document.getElementById('f-link').value.trim();
+  const notes     = document.getElementById('f-notes').value.trim();
+  const suggester = document.getElementById('f-suggester').value.trim();
+
+  if (!title)     { document.getElementById('f-title').focus(); return; }
+  if (!link)      { document.getElementById('f-link').focus(); return; }
+  if (!notes)     { document.getElementById('f-notes').focus(); return; }
+  if (!suggester) { document.getElementById('f-suggester').focus(); return; }
+
+  // Remember this name for future votes/sessions
+  userName = suggester;
+  localStorage.setItem(NAME_KEY, userName);
+  document.getElementById('name-banner').style.display = 'none';
+
+  // Auto-vote: submitter's vote counts as the first vote
+  const voteKey = userName.replace(/[^a-zA-Z0-9]/g, '_');
 
   const article = {
     title, link,
-    authors:     document.getElementById('f-authors').value.trim(),
-    journal:     document.getElementById('f-journal').value.trim(),
-    notes:       document.getElementById('f-notes').value.trim(),
-    date:        document.getElementById('f-date').value,
-    suggestedBy: userName || 'Anonymous',
+    notes,
+    suggestedBy: userName,
     createdAt:   Date.now(),
-    votes:       {},
+    votes:       { [voteKey]: true },
   };
 
   if (db) {
@@ -614,7 +578,6 @@ async function submitArticle() {
   }
   closeAddForm();
   toast('Article submitted!');
-  notifySlack(article);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -887,12 +850,9 @@ function init() {
   // Firebase — merge boot() injected values over anything from localStorage
   // This ensures injected secrets always win over stale cached values
   const injected = {
-    apiKey:        '__FIREBASE_API_KEY__',
-    dbUrl:         '__FIREBASE_DB_URL__',
-    password:      '__JC_PASSWORD__',
-    ejsPublicKey:  '__EMAILJS_PUBLIC_KEY__',
-    ejsServiceId:  '__EMAILJS_SERVICE_ID__',
-    ejsTemplateId: '__EMAILJS_TEMPLATE_ID__'
+    apiKey:   '__FIREBASE_API_KEY__',
+    dbUrl:    '__FIREBASE_DB_URL__',
+    password: '__JC_PASSWORD__'
   };
   cfg = Object.assign({}, cfg, injected);
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
@@ -903,11 +863,9 @@ function init() {
 (function boot() {
   // Hardcoded config injected at deploy time by GitHub Actions
   cfg = {
-    apiKey:            '__FIREBASE_API_KEY__',
-    dbUrl:             '__FIREBASE_DB_URL__',
-    password:          '__JC_PASSWORD__',
-    ghToken:   '__GH_PAT_TOKEN__',
-    ghRepo:    '__GH_REPO__'
+    apiKey:   '__FIREBASE_API_KEY__',
+    dbUrl:    '__FIREBASE_DB_URL__',
+    password: '__JC_PASSWORD__'
   };
   // Save to localStorage so the rest of the app finds it normally
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
