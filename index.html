@@ -381,6 +381,7 @@
 <!-- Firebase SDK v9 compat -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
 <script>
 /* ═══════════════════════════════════════════════════
@@ -450,7 +451,16 @@ function connectFirebase() {
     }
     db = firebase.database();
     setSyncStatus('', 'connecting…');
-    subscribeToData();
+
+    // Sign in anonymously so Firebase security rules can require auth != null
+    firebase.auth().signInAnonymously()
+      .then(() => {
+        subscribeToData();
+      })
+      .catch(e => {
+        console.error('Firebase auth error:', e);
+        setSyncStatus('error', 'auth error');
+      });
   } catch(e) {
     console.error('Firebase init error:', e);
     setSyncStatus('error', 'connection error');

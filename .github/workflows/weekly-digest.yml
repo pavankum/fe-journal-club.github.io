@@ -13,7 +13,8 @@ jobs:
       - name: Build and send digest
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          FIREBASE_DB_URL:   ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_DB_URL:    ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_DB_SECRET: ${{ secrets.FIREBASE_DB_SECRET }}
           SITE_URL:          "https://pavankum.github.io/fe-journal-club.github.io/"
         run: |
           python3 - <<'PYEOF'
@@ -23,8 +24,10 @@ jobs:
           webhook  = os.environ['SLACK_WEBHOOK_URL']
           site     = os.environ['SITE_URL']
 
-          # Fetch all articles from Firebase REST API
-          articles_url = f"{db_url}/articles.json"
+          # Fetch all articles from Firebase REST API using DB secret for auth
+          db_secret = os.environ.get('FIREBASE_DB_SECRET', '')
+          auth_param = f"?auth={db_secret}" if db_secret else ""
+          articles_url = f"{db_url}/articles.json{auth_param}"
           with urllib.request.urlopen(articles_url) as res:
             data = json.loads(res.read().decode()) or {}
 
